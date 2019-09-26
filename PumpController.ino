@@ -1,9 +1,7 @@
 //#include <EEPROMex.h>
 //#include <EEPROMVar.h>
 
-// include the library code:
 #include <LiquidCrystal.h>
-//#include <Wire.h>
 #include <EEPROMex.h>
 
 const byte CALIBRATION_MENU_POS = 0;
@@ -16,7 +14,11 @@ const String items[menuItemsCount] = {"Calibration", "Regime", "Back"};
 const float expectedCallibratedMilliliters = 1.0;
 const float defaultCalibrationCoeficient = 100.0; // тут має бути таке число, щоб якщо його помножити на milliliters - результуючий тон відповідмав бажаним ml/h
 
-int defaultSpeed = 100;
+const uint16_t canary = 0xD5A3;
+
+const int canaryAdress = 0;
+const int millilitersAdress = 2;
+const int calibrationCoeficientAddress = 4;
 
 enum Key {
   Select,
@@ -45,6 +47,8 @@ State state = Default;
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 void setup() {
+  readEEPROM();
+
   lcd.begin(16, 2);
   lcd.clear();
   pinMode(dirPin, OUTPUT);
@@ -53,6 +57,16 @@ void setup() {
   digitalWrite (dirPin, HIGH);
   digitalWrite (enPin, HIGH);
   showDefaultState();
+}
+
+func readEEPROM() {
+  uint16_t potentialCanary = readInt(canaryAdress);
+  if (potentialCanary == canary) {
+    milliliters = readInt(millilitersAdress);
+    calibrationCoeficient = readFloat(calibrationCoeficientAddress);
+  } else {
+    writeInt(canary, canaryAdress);
+  }
 }
 
 void loop() {
