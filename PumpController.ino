@@ -50,6 +50,8 @@ State state = Default;
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
+EEPROMClassEx eepom = EEPROMClassEx();
+
 void setup() {
   readEEPROM();
 
@@ -64,14 +66,14 @@ void setup() {
 }
 
 void readEEPROM() {
-  uint16_t potentialCanary = readInt(canaryAdress);
+  uint16_t potentialCanary = eepom.readInt(canaryAdress);
   if (potentialCanary == canary) {
-    milliliters = readInt(millilitersAdress);
-    calibrationCoeficient = readFloat(calibrationCoeficientAddress);
+    milliliters = eepom.readInt(millilitersAdress);
+    calibrationCoeficient = eepom.readFloat(calibrationCoeficientAddress);
   } else {
-    writeInt(canaryAdress, canary);
-    writeInt(millilitersAdress, milliliters);
-    writeFloat(calibrationCoeficientAddress, calibrationCoeficient);
+    eepom.writeInt(canaryAdress, canary);
+    eepom.writeInt(millilitersAdress, milliliters);
+    eepom.writeFloat(calibrationCoeficientAddress, calibrationCoeficient);
   }
 }
 
@@ -262,7 +264,7 @@ void decreaseSpeed() {
 
 void applyCalibration() {
   calibrationCoeficient = defaultCalibrationCoeficient / (actualCallibratedMilliliters / expectedCallibratedMilliliters);
-  updateFloat(calibrationCoeficientAddress, calibrationCoeficient);
+  eepom.updateFloat(calibrationCoeficientAddress, calibrationCoeficient);
 }
 
 void showDefaultState() {
@@ -321,7 +323,7 @@ void stopBlinking() {
 void applyNewSpeed() {
   speedChangeStartTime = 0; // скидаємо таймер
   stopBlinking(); // перестаємо мигати
-  updateInt(millilitersAdress, milliliters);// зберігаємо нове значення
+  eepom.updateInt(millilitersAdress, milliliters);// зберігаємо нове значення
   showDefaultState(); // показуємо нове значення
 }
 
