@@ -86,14 +86,14 @@ void loop() {
 }
 
 void processKeyInput() {
-  Key key = key();
+  Key pressedKey = redKey();
 
-  if (isBlinking && key != Up && key != Down) {
+  if (isBlinking && pressedKey != Up && pressedKey != Down) {
     // виходимо, якщо цифри мигають і користувач нажимає якусь іншу кнопку крім донизу чи догори. щоб не поламати логіку. 
     return;
   }
 
-  switch (key) {
+  switch (pressedKey) {
    case Select:
     handleSelect();
     break;
@@ -244,7 +244,7 @@ void printCalibration() {
 
 void increaseSpeed() {
   milliliters += 1; // Потрібно додати обмеження на максимальне значення milliliters
-  if (!isBlinking {
+  if (!isBlinking) {
     startBlinking();
   }
 
@@ -255,7 +255,7 @@ void decreaseSpeed() {
   if (milliliters > 1) {
     milliliters -= 1;
 
-    if (!isBlinking {
+    if (!isBlinking) {
       startBlinking();
     }
     speedChangeStartTime = millis();
@@ -330,7 +330,7 @@ void applyNewSpeed() {
 /////////////////////////////////////
 // Робота з кнопками
 
-Key key(){//1-719, 2 - 477, 3 - 131, 4 -305, 5 - 0
+Key redKey(){//1-719, 2 - 477, 3 - 131, 4 -305, 5 - 0
   delay(100);
   int val = analogRead(0);
   delay(100);
