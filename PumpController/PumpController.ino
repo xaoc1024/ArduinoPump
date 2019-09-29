@@ -1,7 +1,3 @@
-// some changes
-//#include <EEPROMex.h>
-//#include <EEPROMVar.h>
-
 #include <LiquidCrystal.h>
 #include <EEPROMex.h>
 
