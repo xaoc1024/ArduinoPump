@@ -50,7 +50,7 @@ State state = Default;
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
-EEPROMClassEx eepom = EEPROMClassEx();
+EEPROMClassEx eeprom = EEPROMClassEx();
 
 void setup() {
   readEEPROM();
@@ -66,14 +66,14 @@ void setup() {
 }
 
 void readEEPROM() {
-  uint16_t potentialCanary = eepom.readInt(canaryAdress);
+  uint16_t potentialCanary = eeprom.readInt(canaryAdress);
   if (potentialCanary == canary) {
-    milliliters = eepom.readInt(millilitersAdress);
-    calibrationCoeficient = eepom.readFloat(calibrationCoeficientAddress);
+    milliliters = eeprom.readInt(millilitersAdress);
+    calibrationCoeficient = eeprom.readFloat(calibrationCoeficientAddress);
   } else {
-    eepom.writeInt(canaryAdress, canary);
-    eepom.writeInt(millilitersAdress, milliliters);
-    eepom.writeFloat(calibrationCoeficientAddress, calibrationCoeficient);
+    eeprom.writeInt(canaryAdress, canary);
+    eeprom.writeInt(millilitersAdress, milliliters);
+    eeprom.writeFloat(calibrationCoeficientAddress, calibrationCoeficient);
   }
 }
 
@@ -244,6 +244,7 @@ void printCalibration() {
 
 void increaseSpeed() {
   milliliters += 1; // Потрібно додати обмеження на максимальне значення milliliters
+  showDefaultState();
   if (!isBlinking) {
     startBlinking();
   }
@@ -254,7 +255,7 @@ void increaseSpeed() {
 void decreaseSpeed() {
   if (milliliters > 1) {
     milliliters -= 1;
-
+    showDefaultState();
     if (!isBlinking) {
       startBlinking();
     }
@@ -264,7 +265,7 @@ void decreaseSpeed() {
 
 void applyCalibration() {
   calibrationCoeficient = defaultCalibrationCoeficient / (actualCallibratedMilliliters / expectedCallibratedMilliliters);
-  eepom.updateFloat(calibrationCoeficientAddress, calibrationCoeficient);
+  eeprom.updateFloat(calibrationCoeficientAddress, calibrationCoeficient);
 }
 
 void showDefaultState() {
@@ -323,7 +324,7 @@ void stopBlinking() {
 void applyNewSpeed() {
   speedChangeStartTime = 0; // скидаємо таймер
   stopBlinking(); // перестаємо мигати
-  eepom.updateInt(millilitersAdress, milliliters);// зберігаємо нове значення
+  eeprom.updateInt(millilitersAdress, milliliters);// зберігаємо нове значення
   showDefaultState(); // показуємо нове значення
 }
 
