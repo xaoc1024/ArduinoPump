@@ -1,9 +1,7 @@
 //#include <EEPROMex.h>
 //#include <EEPROMVar.h>
 
-// include the library code:
 #include <LiquidCrystal.h>
-//#include <Wire.h>
 #include <EEPROMex.h>
 
 const byte CALIBRATION_MENU_POS = 0;
@@ -13,10 +11,14 @@ const int stepPin = 13;
 const int enPin = 11;
 const byte menuItemsCount = 3;
 const String items[menuItemsCount] = {"Calibration", "Regime", "Back"};
-const float expectedCallibratedMilliliters = 1.0;
+const float expectedCallibratedMilliliters = 20.0;
 const float defaultCalibrationCoeficient = 100.0; // тут має бути таке число, щоб якщо його помножити на milliliters - результуючий тон відповідмав бажаним ml/h
 
-int defaultSpeed = 100;
+const uint16_t canary = 0xD5A3;
+
+const int canaryAdress = 0;
+const int millilitersAdress = 2;
+const int calibrationCoeficientAddress = 4;
 
 enum Key {
   Select,
@@ -38,29 +40,60 @@ float actualCallibratedMilliliters = expectedCallibratedMilliliters;
 float calibrationCoeficient = defaultCalibrationCoeficient; // це число треба буде підібрати 
 int milliliters = 20; 
 
+unsigned long speedChangeStartTime = 0;
+unsigned long speedChangeThreshold = 5000;// 5 sec
+bool isBlinking = false;
+
 byte currentMenuPosition = 0;
 State state = Default;
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
+EEPROMClassEx eeprom = EEPROMClassEx();
+
 void setup() {
+  readEEPROM();
+
   lcd.begin(16, 2);
   lcd.clear();
   pinMode(dirPin, OUTPUT);
   pinMode(stepPin, OUTPUT);
   pinMode(enPin, OUTPUT);
-  digitalWrite (dirPin, HIGH);
-  digitalWrite (enPin, HIGH);
+  digitalWrite(dirPin, HIGH);
+  digitalWrite(enPin, HIGH);
   showDefaultState();
+}
+
+void readEEPROM() {
+  uint16_t potentialCanary = eeprom.readInt(canaryAdress);
+  if (potentialCanary == canary) {
+    milliliters = eeprom.readInt(millilitersAdress);
+    calibrationCoeficient = eeprom.readFloat(calibrationCoeficientAddress);
+  } else {
+    eeprom.writeInt(canaryAdress, canary);
+    eeprom.writeInt(millilitersAdress, milliliters);
+    eeprom.writeFloat(calibrationCoeficientAddress, calibrationCoeficient);
+  }
 }
 
 void loop() {
   processKeyInput();
+
+  if (isBlinking && millis() > (speedChangeStartTime + speedChangeThreshold)) { // перевірка, якщо мигає і пройшло 5 секунд від останнього нажаття на кнопку, то перестаємо мигати і показуємо те, що юзер ввів і міняємо швидкість на нововедену
+    applyNewSpeed();
+  }
 }
 
 void processKeyInput() {
-  switch (key()) {
+  Key pressedKey = redKey();
+
+  if (isBlinking && pressedKey != Up && pressedKey != Down) {
+    // виходимо, якщо цифри мигають і користувач нажимає якусь іншу кнопку крім донизу чи догори. щоб не поламати логіку. 
+    return;
+  }
+
+  switch (pressedKey) {
    case Select:
     handleSelect();
     break;
@@ -106,7 +139,7 @@ void handleLeft() {
     case Menu:
       scrollMenuLeft();
       break;
-      case Default:
+    case Default:
       showDefaultState();
         break;
     }
@@ -115,13 +148,11 @@ void handleLeft() {
 void handleRight() {
     switch (state) {
       case Menu:
-      scrollMenuRight();
+        scrollMenuRight();
         break;
       case Default:
-      tone(stepPin, 9600);
-      //delay(1000);
-      
-      //noTone(stepPin);
+      // я так розумію, тут ти хотів включити максимальну швидкість мотора, коли нажимається кнопка вправо. якщо так, то це треба робити по іншому.
+        tone(stepPin, 9600);
         break;
         
     }
@@ -134,7 +165,7 @@ void handleUp() {
     break;
 
   case Calibration:
-    increaseCalibrationMillimenters();
+    increaseCalibrationMilliliters();
     break;
   } 
 }
@@ -146,7 +177,7 @@ void handleDown() {
     break;
 
   case Calibration:
-    decreaseCalibrationMillimenters();
+    decreaseCalibrationMilliliters();
     break;
   }
 }
@@ -179,40 +210,22 @@ void stopEngine() {
 void startCalibration() {
   state = Calibration;
 
-  //bool flag = false; 
-//{
-  
-  
-  //for (int i = 0; i < rotationCountFor20ml; i++) {
-    //digitalWrite (stepPin, flag ? HIGH : LOW);
-    //flag = !flag;
-    //delayMicroseconds(10000);
-
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Calibrating...");
-    lcd.setCursor(0,1);
-    tone(stepPin, 4800, 10000);
-    delay(11000);
-    //noTone (stepPin);
-    // пробуємо вивести відсотки програсу
-    //int percent =  (int)((i / (float)rotationCountFor20ml) * 100.0);
-    //lcd.print(percent);
-  //}
-
-  //lcd.setCursor(0,1);
-  //lcd.print("100%% completed");
-  //delay(1000);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Calibrating...");
+  lcd.setCursor(0,1);
+  tone(stepPin, 4800, 10000);
+  delay(11000);
 
   printCalibration();
 }
 
-void increaseCalibrationMillimenters() {
+void increaseCalibrationMilliliters() {
   actualCallibratedMilliliters += 1;
   printCalibration();
 }
 
-void decreaseCalibrationMillimenters() {
+void decreaseCalibrationMilliliters() {
   // тут перевірка на білье 1 а не більше 0, 
   // тому що якщо буде нуль і ми на цей коефіцієнт десь захочемо поділити,
   // програма впаде, бо ділини на 0 не можна.
@@ -230,20 +243,29 @@ void printCalibration() {
 }
 
 void increaseSpeed() {
-  milliliters += 1;
+  milliliters += 1; // Потрібно додати обмеження на максимальне значення milliliters
   showDefaultState();
+  if (!isBlinking) {
+    startBlinking();
+  }
+
+  speedChangeStartTime = millis();
 }
 
 void decreaseSpeed() {
   if (milliliters > 1) {
-      milliliters -= 1;
+    milliliters -= 1;
+    showDefaultState();
+    if (!isBlinking) {
+      startBlinking();
+    }
+    speedChangeStartTime = millis();
   }
-
-  showDefaultState();
 }
 
 void applyCalibration() {
   calibrationCoeficient = defaultCalibrationCoeficient / (actualCallibratedMilliliters / expectedCallibratedMilliliters);
+  eeprom.updateFloat(calibrationCoeficientAddress, calibrationCoeficient);
 }
 
 void showDefaultState() {
@@ -288,10 +310,28 @@ String getCurrentMenuItem() {
   return items[currentMenuPosition];
 }
 
+// blinking
+void startBlinking() {
+  isBlinking = true;
+  lcd.blink();
+}
+
+void stopBlinking() {
+  isBlinking = false;
+  lcd.noBlink(); 
+}
+
+void applyNewSpeed() {
+  speedChangeStartTime = 0; // скидаємо таймер
+  stopBlinking(); // перестаємо мигати
+  eeprom.updateInt(millilitersAdress, milliliters);// зберігаємо нове значення
+  showDefaultState(); // показуємо нове значення
+}
+
 /////////////////////////////////////
 // Робота з кнопками
 
-Key key(){//1-719, 2 - 477, 3 - 131, 4 -305, 5 - 0
+Key redKey(){//1-719, 2 - 477, 3 - 131, 4 -305, 5 - 0
   delay(100);
   int val = analogRead(0);
   delay(100);
